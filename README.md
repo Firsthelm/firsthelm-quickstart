@@ -12,13 +12,18 @@ register agent  →  run task  →  check constraint before each action
                 →  approve the risky one in your dashboard  →  audit trail
 ```
 
-You'll watch three actions happen:
+The demo agent attempts three actions — drafting a message, sending an
+email, and deleting old records — and each one is checked against your
+policy *before* it executes. What you see depends on the constraints you
+enable:
 
-1. `draft_message` — a harmless action that runs immediately (allowed).
-2. `send_email` — a consequential action that **pauses mid-flight** and waits
-   for your approval in the FirstHelm dashboard.
-3. `delete_old_records` — a dangerous action that gets **blocked** by the
-   constraint you'll create, and never executes.
+- **No constraints (or none that match)** — every action returns `PASS`
+  and executes: the happy path, fully audited.
+- **An Approval Gate enabled** — actions pause mid-flight with
+  `NEEDS_APPROVAL` and wait for your decision in the FirstHelm dashboard.
+  Silence is never treated as consent.
+- **A Budget Limit or Time Window** — policy that governs by cost and
+  schedule, no code required.
 
 That's the whole pitch: frameworks build agents; FirstHelm governs them.
 
@@ -44,19 +49,23 @@ invalidates the old one.
 git clone https://github.com/Firsthelm/firsthelm-quickstart.git
 cd firsthelm-quickstart
 export FIRSTHELM_API_KEY="fhk_your_api_key_here"    # macOS / Linux
-# Windows PowerShell:
-#   $env:FIRSTHELM_API_KEY="fhk_your_api_key_here"
+# Windows PowerShell (use single quotes — double quotes can mangle keys):
+#   $env:FIRSTHELM_API_KEY='fhk_your_api_key_here'
 ```
 
 ### 3. Create the demo constraints in the dashboard
 
-In the FirstHelm dashboard:
+In the FirstHelm dashboard, open **Constraints**. Constraints are typed
+policy templates — Approval Gate, Action Restriction, Budget Limit, Time
+Window, Forbidden Action — with parameters, not code. For the classic demo:
 
-1. Open **Constraints** and create a constraint for the agent you're about
-   to register, or apply the sample rule set from `constraints.sample.json`.
-2. The effect we want: the `tool_call` action (record deletion) is blocked
-   outright, the `communication` action (the email) requires human approval,
-   and the `reasoning` step is allowed.
+1. Enable the **Approval Gate** to watch actions pause for your decision
+   in **Dashboard → Approvals**.
+2. Add a **Budget Limit** or **Time Window** to see policy that governs by
+   cost and schedule.
+3. Re-run `agent.py` as many times as you like — each run registers a
+   fresh agent (random suffix), so your dashboard stays tidy if you delete
+   the test agents afterwards.
 
 No code needed — constraints are policy, not code. That's the point.
 
@@ -66,9 +75,10 @@ No code needed — constraints are policy, not code. That's the point.
 python3 agent.py
 ```
 
-You'll see it register itself, attempt its three actions, and pause on the
-email. Follow the console output to the dashboard, approve (or reject) the
-pending request, and watch the agent continue — or stop — accordingly.
+You'll see it register itself, then attempt its three actions with a
+verdict before each one. With an Approval Gate on, it pauses mid-run —
+approve or reject the pending request in **Dashboard → Approvals**, then
+press Enter in the terminal to continue.
 
 ### 5. What just happened
 
@@ -101,6 +111,15 @@ agent, showing how the control plane slots into a real framework workflow
 
 - **401 Unauthorized** — your API key is wrong, revoked, or not exported
   in this shell. Re-run `export FIRSTHELM_API_KEY=...`.
+- **403 with an HTML error page** — some corporate networks and proxies
+  block requests that identify as `Python-urllib`. The demo sets a proper
+  `User-Agent` to avoid this; if you use another client, do the same.
+- **400 "Agent name must be unique"** — agent names are unique per
+  organisation. The demo appends a random suffix, but if you rename it,
+  pick a fresh name on each run.
+- **Invalid authorization header** — the header must read exactly
+  `Authorization: Bearer <your key>`. In PowerShell, set environment
+  variables with single quotes so nothing gets mangled.
 - **Agent not visible in dashboard** — make sure you registered it against
   the same organisation as your dashboard login.
 

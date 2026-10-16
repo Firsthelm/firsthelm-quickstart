@@ -1,15 +1,20 @@
 {
-  "comment": "Mirror these rules on the Constraints page in the FirstHelm dashboard for the demo. action_type is an enum: tool_call, reasoning, communication, decision, error, waiting_approval, completed.",
-  "rules": [
+  "comment": "Mirror these on the Constraints page in the FirstHelm dashboard. Constraints are typed templates with parameters — this sample shows the two that power the quickstart demo.",
+  "constraints": [
     {
-      "action_type": "tool_call",
-      "verdict": "blocked",
-      "reason": "Destructive tool calls (like the 90-day record deletion) are refused outright in the quickstart demo."
+      "type": "Approval Gate",
+      "parameters": { "requires_human": true },
+      "purpose": "Actions pause mid-flight with NEEDS_APPROVAL until a human decides in Dashboard -> Approvals. Enable this to see human-in-the-loop in the demo."
     },
     {
-      "action_type": "communication",
-      "verdict": "needs_approval",
-      "reason": "Outbound communications pause mid-flight for a human decision."
+      "type": "Budget Limit",
+      "parameters": { "max_daily_cost_cents": 5000 },
+      "purpose": "Blocks any action once daily spend exceeds the limit. A costed action in the demo trips it when set low."
+    },
+    {
+      "type": "Time Window",
+      "parameters": { "start_time": "09:00", "end_time": "17:00", "timezone": "Europe/London" },
+      "purpose": "Actions outside the window are governed by the window policy — run the demo after hours to see it refuse."
     }
   ]
 }
