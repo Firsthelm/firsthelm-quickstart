@@ -54,6 +54,25 @@ def call(function: str, payload: dict) -> dict:
                         "Check your connection and FIRSTHELM_API_URL.")
 
 
+
+def extract_agent_id(response) -> str:
+    """Pull the agent id out of a registerAgent response.
+
+    Envelope: {"status": "ok", "agent": {"id": "...", ...}}
+    Also tolerates {"id": ...} or {"data": {...}} shapes.
+    """
+    if not isinstance(response, dict):
+        return "unknown"
+    for candidate in (
+        response.get("agent"),
+        response.get("data") if isinstance(response.get("data"), dict) else None,
+        response,
+    ):
+        if isinstance(candidate, dict) and candidate.get("id"):
+            return candidate["id"]
+    return "unknown"
+
+
 def get_verdict(response: dict) -> str:
     """
     Extract the constraint verdict from an evaluateConstraint response.
@@ -90,10 +109,12 @@ def main() -> None:
         "framework": "custom",
         "description": "Quickstart demo agent — three actions, one governance loop.",
     })
-    agent_id = (
-        (reg.get("id") or (reg.get("data", {}) or {}).get("id") or "unknown")
-        if isinstance(reg, dict) else "unknown"
-    )
+    agent_id = extract_agent_id(reg)
+    if agent_id == "unknown":
+        raise SystemExit(
+            "Could not find an agent id in the registerAgent response. "
+            f"Raw response:\n{json.dumps(reg, indent=2)[:600]}"
+        )
     print(f"    Agent ID: {agent_id}")
     print("    Open your dashboard → Agents: it should be there now.")
 
@@ -127,6 +148,9 @@ def main() -> None:
         })
         verdict = get_verdict(response)
         print(f"    Control plane says: {verdict.upper()}")
+        if verdict == "unknown":
+            print("    (Unrecognised response — paste this to us if unsure:)")
+            print(f"    {json.dumps(response, default=str)[:400]}")
         audit.append((action["type"], verdict))
 
         if verdict == "blocked":

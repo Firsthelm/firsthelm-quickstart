@@ -46,6 +46,21 @@ def firsthelm_call(function: str, payload: dict) -> dict:
         return json.loads(resp.read())
 
 
+
+def extract_agent_id(response) -> str:
+    """Pull the agent id from a registerAgent response: {"agent": {"id": ...}}."""
+    if not isinstance(response, dict):
+        return "unknown"
+    for candidate in (
+        response.get("agent"),
+        response.get("data") if isinstance(response.get("data"), dict) else None,
+        response,
+    ):
+        if isinstance(candidate, dict) and candidate.get("id"):
+            return candidate["id"]
+    return "unknown"
+
+
 def governed(tool_name: str, action_type: str):
     """
     Decorator that turns any function into a FirstHelm-governed tool.
@@ -126,10 +141,11 @@ def main() -> None:
         "description": "Quickstart demo — governed LangChain-style tools.",
         "autonomy_level": 2,
     })
-    agent_id = (
-        (reg.get("id") or (reg.get("data", {}) or {}).get("id") or "unknown")
-        if isinstance(reg, dict) else "unknown"
-    )
+    agent_id = extract_agent_id(reg)
+    if agent_id == "unknown":
+        raise SystemExit(
+            f"Could not find an agent id in the registerAgent response: {reg}"
+        )
     print(f"\nAgent registered: {agent_id}")
 
     print("\nStep 1: draft the email (no tool call — just planning)")
