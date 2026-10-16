@@ -1,0 +1,15 @@
+{
+  "comment": "Mirror these rules on the Constraints page in the FirstHelm dashboard for the demo: dangerous actions blocked outright, consequential actions paused for human approval, everything else allowed.",
+  "rules": [
+    {
+      "action_pattern": "delete_*",
+      "verdict": "blocked",
+      "reason": "Destructive actions are refused outright in the quickstart demo."
+    },
+    {
+      "action_pattern": "send_*",
+      "verdict": "needs_approval",
+      "reason": "Outbound communications pause mid-flight for a human decision."
+    }
+  ]
+}

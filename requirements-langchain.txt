@@ -1,0 +1,3 @@
+# Only needed for langchain_agent.py.
+# agent.py is pure standard library — nothing to install.
+langchain>=0.2
