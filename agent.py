@@ -15,6 +15,7 @@ Zero dependencies: standard-library Python only.
 
 import json
 import os
+import secrets
 import urllib.request
 import urllib.error
 
@@ -105,7 +106,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     print("\n[1] Registering agent with the control plane...")
     reg = call("registerAgent", {
-        "name": "quickstart-agent",
+        "name": f"quickstart-agent-{secrets.token_hex(2)}",
         "framework": "custom",
         "description": "Quickstart demo agent — three actions, one governance loop.",
     })

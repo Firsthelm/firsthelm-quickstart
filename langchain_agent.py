@@ -19,6 +19,7 @@ a production LangChain agent.
 
 import json
 import os
+import secrets
 import urllib.request
 from functools import wraps
 
@@ -136,7 +137,7 @@ def main() -> None:
     print("=" * 62)
 
     reg = firsthelm_call("registerAgent", {
-        "name": "quickstart-langchain-agent",
+        "name": f"quickstart-langchain-{secrets.token_hex(2)}",
         "framework": "langchain",
         "description": "Quickstart demo — governed LangChain-style tools.",
         "autonomy_level": 2,
