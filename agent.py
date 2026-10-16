@@ -8,13 +8,13 @@ for a verdict, and it only proceeds when the human in the loop says so.
 
 Zero dependencies: standard-library Python only.
 
-    export FIRSTHELM_API_KEY="fhk_..."
-    python3 agent.py
+    export FIRSTHELM_API_KEY="fhk_..."     (macOS/Linux)
+    $env:FIRSTHELM_API_KEY="fhk_..."       (Windows PowerShell)
+    python agent.py
 """
 
 import json
 import os
-import time
 import urllib.request
 
 API_URL = os.environ.get("FIRSTHELM_API_URL", "https://api.firsthelm.dev/functions")
@@ -41,22 +41,23 @@ def call(function: str, payload: dict) -> dict:
 
 def get_verdict(response: dict) -> str:
     """
-    Extract the constraint verdict from a logActivity response.
+    Extract the constraint verdict from an evaluateConstraint response.
 
     FirstHelm returns one of three verdicts:
         allowed         -> the agent may proceed
         blocked         -> the action is refused, it never executes
         needs_approval  -> the action pauses; a human must decide
 
-    The key is normalised defensively so this demo keeps working even if
-    the response envelope changes shape.
+    The key is read defensively so this demo keeps working even if the
+    response envelope changes shape.
     """
-    for candidate in (response, response.get("data", {}) if isinstance(response, dict) else {}):
-        if not isinstance(candidate, dict):
-            continue
-        for key in ("verdict", "status", "result", "decision"):
-            if key in candidate:
-                return str(candidate[key])
+    if not isinstance(response, dict):
+        return "unknown"
+    for candidate in (response, response.get("data") or {}):
+        if isinstance(candidate, dict):
+            for key in ("verdict", "status", "result", "decision"):
+                if key in candidate:
+                    return str(candidate[key])
     return "unknown"
 
 
@@ -73,7 +74,6 @@ def main() -> None:
         "name": "quickstart-agent",
         "framework": "custom",
         "description": "Quickstart demo agent — three actions, one governance loop.",
-        "autonomy_level": 2,  # 0 = fully supervised ... 5 = fully autonomous
     })
     agent_id = (
         (reg.get("id") or (reg.get("data", {}) or {}).get("id") or "unknown")
@@ -83,25 +83,32 @@ def main() -> None:
     print("    Open your dashboard → Agents: it should be there now.")
 
     # ------------------------------------------------------------------
-    # Beat 2: The task. Three actions, increasing risk:
-    #          draft (safe) → send (consequential) → delete (dangerous).
+    # Beat 2: The task. Three actions, increasing risk.
+    # action_type is an enum — FirstHelm accepts: tool_call, reasoning,
+    # communication, decision, error, waiting_approval, completed.
     # ------------------------------------------------------------------
     task = [
-        {"type": "draft_message", "description": "Draft a welcome email for customer #1042"},
-        {"type": "send_email", "description": "Send the welcome email to customer #1042"},
-        {"type": "delete_old_records", "description": "Delete records older than 90 days"},
+        {"type": "reasoning",    "description": "Draft a welcome email for customer #1042 (planning step)"},
+        {"type": "communication", "description": "Send the welcome email to customer #1042"},
+        {"type": "tool_call",     "description": "Delete records older than 90 days"},
     ]
     audit = []
 
     for action in task:
         print(f"\n[2] Agent wants to: {action['description']}")
 
-        # -- Pre-execution check: log the action, get the verdict --------
-        response = call("logActivity", {
+        # -- Record the intended action on the audit trail ---------------
+        call("logActivity", {
             "agent_id": agent_id,
             "action_type": action["type"],
             "description": action["description"],
-            "payload": {"task": "quickstart"},
+        })
+
+        # -- Pre-execution check: evaluate the constraint, get the verdict
+        response = call("evaluateConstraint", {
+            "agent_id": agent_id,
+            "action_type": action["type"],
+            "description": action["description"],
         })
         verdict = get_verdict(response)
         print(f"    Control plane says: {verdict.upper()}")
@@ -116,19 +123,15 @@ def main() -> None:
             print("    → Pausing. Requesting human approval...")
             call("requestApproval", {
                 "agent_id": agent_id,
-                "action_type": action["type"],
-                "description": action["description"],
+                "action_description": action["description"],
             })
             print("    Check your dashboard → Approvals. Approve or reject it.")
-            answer = input("    Once you've decided in the dashboard, press Enter to continue... ")
-            if answer.strip().lower() == "reject":
-                print("    → Agent will skip this action after the rejection.")
-            else:
-                print("    → Approved. Agent proceeds, and the decision is on the record.")
+            input("    Once you've decided in the dashboard, press Enter to continue... ")
+            print("    → Decision made. The agent continues, and the call is on the record.")
 
         else:
-            # allowed (or the demo constraint hasn't been set up yet —
-            # the action runs, which is also a useful thing to notice).
+            # allowed (or no constraint matches — also a useful thing to
+            # notice: if nothing pauses, check step 3 in the README).
             print("    → Allowed. Action executes.")
 
     # ------------------------------------------------------------------
@@ -136,7 +139,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     print("\n[3] Audit summary for this run:")
     for action_type, verdict in audit:
-        print(f"    {action_type:<20} {verdict}")
+        print(f"    {action_type:<14} {verdict}")
     print("\nFull detail lives in your dashboard → Activity Log.")
     print("That's the loop: registry → pre-execution check → approval → audit.")
     print("Frameworks build agents. FirstHelm governs them.")

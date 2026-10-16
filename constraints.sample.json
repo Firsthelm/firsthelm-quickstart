@@ -1,13 +1,13 @@
 {
-  "comment": "Mirror these rules on the Constraints page in the FirstHelm dashboard for the demo: dangerous actions blocked outright, consequential actions paused for human approval, everything else allowed.",
+  "comment": "Mirror these rules on the Constraints page in the FirstHelm dashboard for the demo. action_type is an enum: tool_call, reasoning, communication, decision, error, waiting_approval, completed.",
   "rules": [
     {
-      "action_pattern": "delete_*",
+      "action_type": "tool_call",
       "verdict": "blocked",
-      "reason": "Destructive actions are refused outright in the quickstart demo."
+      "reason": "Destructive tool calls (like the 90-day record deletion) are refused outright in the quickstart demo."
     },
     {
-      "action_pattern": "send_*",
+      "action_type": "communication",
       "verdict": "needs_approval",
       "reason": "Outbound communications pause mid-flight for a human decision."
     }

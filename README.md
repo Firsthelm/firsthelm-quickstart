@@ -43,7 +43,9 @@ invalidates the old one.
 ```bash
 git clone https://github.com/Firsthelm/firsthelm-quickstart.git
 cd firsthelm-quickstart
-export FIRSTHELM_API_KEY="fhk_your_api_key_here"
+export FIRSTHELM_API_KEY="fhk_your_api_key_here"    # macOS / Linux
+# Windows PowerShell:
+#   $env:FIRSTHELM_API_KEY="fhk_your_api_key_here"
 ```
 
 ### 3. Create the demo constraints in the dashboard
@@ -52,8 +54,9 @@ In the FirstHelm dashboard:
 
 1. Open **Constraints** and create a constraint for the agent you're about
    to register, or apply the sample rule set from `constraints.sample.json`.
-2. The effect we want: `delete_*` actions are blocked outright, `send_*`
-   actions require human approval, everything else is allowed.
+2. The effect we want: the `tool_call` action (record deletion) is blocked
+   outright, the `communication` action (the email) requires human approval,
+   and the `reasoning` step is allowed.
 
 No code needed — constraints are policy, not code. That's the point.
 

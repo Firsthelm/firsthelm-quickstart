@@ -43,7 +43,7 @@ def firsthelm_call(function: str, payload: dict) -> dict:
         return json.loads(resp.read())
 
 
-def governed(tool_name: str):
+def governed(tool_name: str, action_type: str):
     """
     Decorator that turns any function into a FirstHelm-governed tool.
 
@@ -58,9 +58,15 @@ def governed(tool_name: str):
     def decorator(fn):
         @wraps(fn)
         def wrapper(agent_id: str, *args, **kwargs):
-            response = firsthelm_call("logActivity", {
+            # record the intended action, then evaluate the constraint
+            firsthelm_call("logActivity", {
                 "agent_id": agent_id,
-                "action_type": tool_name,
+                "action_type": ACTION_TYPE,
+                "description": fn.__doc__ or tool_name,
+            })
+            response = firsthelm_call("evaluateConstraint", {
+                "agent_id": agent_id,
+                "action_type": ACTION_TYPE,
                 "description": fn.__doc__ or tool_name,
             })
             verdict = (
@@ -78,8 +84,7 @@ def governed(tool_name: str):
             if verdict == "needs_approval":
                 firsthelm_call("requestApproval", {
                     "agent_id": agent_id,
-                    "action_type": tool_name,
-                    "description": fn.__doc__ or tool_name,
+                    "action_description": fn.__doc__ or tool_name,
                 })
                 print("    [control plane] paused: approve in the dashboard, then re-run")
                 return {"status": "needs_approval", "result": None}
@@ -93,14 +98,14 @@ def governed(tool_name: str):
 
 # --- The "agent": a minimal LangChain-style task loop -------------------
 
-@governed("send_email")
+@governed("send_email", action_type="communication")
 def send_email(to: str, body: str) -> dict:
     """Send the welcome email to a customer."""
     print(f"    [tool] email sent to {to}")
     return {"sent": True, "to": to}
 
 
-@governed("delete_old_records")
+@governed("delete_old_records", action_type="tool_call")
 def delete_old_records(days: int = 90) -> dict:
     """Delete records older than the given number of days."""
     print(f"    [tool] would delete records older than {days} days")
