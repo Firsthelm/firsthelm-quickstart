@@ -16,6 +16,7 @@ Zero dependencies: standard-library Python only.
 import json
 import os
 import urllib.request
+import urllib.error
 
 API_URL = os.environ.get("FIRSTHELM_API_URL", "https://api.firsthelm.dev/functions")
 API_KEY = os.environ.get("FIRSTHELM_API_KEY", "")
@@ -32,11 +33,25 @@ def call(function: str, payload: dict) -> dict:
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {API_KEY}",
+            # Default "Python-urllib" is blocked by some API gateways;
+            # identify ourselves properly instead.
+            "User-Agent": "firsthelm-quickstart/1.0",
         },
         method="POST",
     )
-    with urllib.request.urlopen(req) as resp:
-        return json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")[:500]
+        raise SystemExit(
+            f"\nAPI error {e.code} from {function}:\n{body}\n"
+            "\nIf this is unexpected, paste the lines above back to us — "
+            "they say exactly what the control plane refused."
+        )
+    except urllib.error.URLError as e:
+        raise SystemExit(f"\nCould not reach {API_URL} ({e.reason}). "
+                        "Check your connection and FIRSTHELM_API_URL.")
 
 
 def get_verdict(response: dict) -> str:

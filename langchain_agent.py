@@ -36,6 +36,9 @@ def firsthelm_call(function: str, payload: dict) -> dict:
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {API_KEY}",
+            # Default "Python-urllib" is blocked by some API gateways;
+            # identify ourselves properly instead.
+            "User-Agent": "firsthelm-quickstart/1.0",
         },
         method="POST",
     )
