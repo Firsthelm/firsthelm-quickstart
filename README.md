@@ -92,6 +92,90 @@ press Enter in the terminal to continue.
 - **Audit trail** — every action, verdict and decision is in your
   Activity Log, exportable as evidence for auditors or regulators.
 
+## Example: a governed CRM update that survives a timeout
+
+`crm_demo.py` answers a question we get from integration teams: *an agent
+writes to a CRM, the write succeeds, but the HTTP response times out — what
+stops the retry from updating the record twice?*
+
+The answer is a separation of responsibilities:
+
+- **FirstHelm** governs *permission to act*: the update is proposed,
+  checked against your policy, and (with an Approval Gate on) waits for a
+  human decision before anything touches the CRM.
+- **The CRM** guarantees *at-most-once execution* via an idempotency key:
+  the same key replays the stored response instead of applying the write
+  again. (Stripe-style `Idempotency-Key` semantics.)
+- **The agent** proposes, waits, executes with a key, and retries with the
+  *same* key when a response is lost. Both attempts land in the audit
+  trail — a retried write is never a silent one.
+
+The file includes a ~60-line mock CRM so you can run the whole thing,
+including the failure, on your machine:
+
+```bash
+python3 crm_demo.py
+```
+
+The run: register → propose `Update CRM record for customer #1042` →
+`NEEDS_APPROVAL` (approve it in the dashboard) → the write is applied but
+the response is withheld → retry with the same idempotency key → the
+original result is recovered, the record is updated **exactly once**, and
+the Activity Log shows the timeout *and* the recovery.
+
+The same loop in plain HTTP, for curl people:
+
+```bash
+# 1. Register the agent
+curl -X POST https://api.firsthelm.dev/functions/registerAgent \
+  -H "Authorization: Bearer $FIRSTHELM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"crm-sync-agent","framework":"custom","description":"CRM sync demo"}'
+
+# 2. Record the proposed action, then ask the control plane for a verdict
+curl -X POST https://api.firsthelm.dev/functions/logActivity \
+  -H "Authorization: Bearer $FIRSTHELM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id":"<AGENT_ID>","action_type":"tool_call",
+       "description":"Update CRM record for customer #1042: set plan to Pro"}'
+
+curl -X POST https://api.firsthelm.dev/functions/evaluateConstraint \
+  -H "Authorization: Bearer $FIRSTHELM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id":"<AGENT_ID>","action_type":"tool_call",
+       "description":"Update CRM record for customer #1042: set plan to Pro"}'
+
+# 3. On needs_approval: create the approval request, decide in the dashboard
+curl -X POST https://api.firsthelm.dev/functions/requestApproval \
+  -H "Authorization: Bearer $FIRSTHELM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id":"<AGENT_ID>","action_description":"Update CRM record for customer #1042"}'
+
+# 4. Execute the approved write WITH an idempotency key
+curl -X PUT "https://your-crm.example.com/customers/1042" \
+  -H "Idempotency-Key: crm-update-8bf0a38b" \
+  -H "Content-Type: application/json" \
+  -d '{"plan":"Pro"}'
+#    ...the CRM applies the write, but the response times out mid-flight.
+
+# 5. Retry with the SAME key — recover the result, don't repeat the write
+curl -X PUT "https://your-crm.example.com/customers/1042" \
+  -H "Idempotency-Key: crm-update-8bf0a38b" \
+  -H "Content-Type: application/json" \
+  -d '{"plan":"Pro"}'
+#    200 — the original result, replayed. The record was updated once.
+
+# 6. Log the recovery so the retry is on the audit trail too
+curl -X POST https://api.firsthelm.dev/functions/logActivity \
+  -H "Authorization: Bearer $FIRSTHELM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id":"<AGENT_ID>","action_type":"completed",
+       "description":"CRM write recovered via idempotency key — applied exactly once"}'
+```
+
+> If nothing pauses in step 3, no constraint matched — enable an Approval
+> Gate first (see step 3 above).
+
 ## The framework variant
 
 `langchain_agent.py` wraps the same governance loop around a LangChain
@@ -103,6 +187,7 @@ agent, showing how the control plane slots into a real framework workflow
 | File | What it is |
 |---|---|
 | `agent.py` | The demo agent — read it, it's ~150 heavily-commented lines |
+| `crm_demo.py` | Governed CRM update with idempotent retry — timeout demo |
 | `langchain_agent.py` | The same loop, LangChain-flavoured |
 | `constraints.sample.json` | The demo rule set to mirror in the dashboard |
 | `.env.example` | Environment variable template |
