@@ -117,6 +117,12 @@ including the failure, on your machine:
 python3 crm_demo.py
 ```
 
+> **Before you run it:** open **Constraints** in the dashboard and make sure
+> an **Approval Gate** is enabled (step 3 above). That's what pauses the
+> update and drops it into your **Approvals** queue. Without it, the verdict
+> comes back `PASS` and the demo skips the human decision entirely —
+> everything else (the timeout and the idempotent recovery) still runs.
+
 The run: register → propose `Update CRM record for customer #1042` →
 `NEEDS_APPROVAL` (approve it in the dashboard) → the write is applied but
 the response is withheld → retry with the same idempotency key → the
